@@ -1,4 +1,4 @@
-package fileparser
+package file
 
 import (
 	"errors"
@@ -7,14 +7,11 @@ import (
 	"path/filepath"
 )
 
-// input: a file path
-// output: a string of the file contents, if it is a valid .go file
-
 const (
 	go_ext = ".go"
 )
 
-func ValidateFile(filePath string) (bool, error) {
+func validate(filePath string) (bool, error) {
 
 	if filepath.Ext(filePath) != go_ext {
 		return false, errors.New("[INVALID] Given file is not a valid GO file.")
@@ -35,9 +32,9 @@ func ValidateFile(filePath string) (bool, error) {
 	return true, nil
 }
 
-func GOFileReader(filePath string) (io.ReadCloser, error) {
+func NewReadCloser(filePath string) (io.ReadCloser, error) {
 
-	ok, err := ValidateFile(filePath)
+	ok, err := validate(filePath)
 	if !ok {
 		return nil, err
 	}
