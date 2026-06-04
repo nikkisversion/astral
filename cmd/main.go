@@ -1,78 +1,43 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"go/ast"
-	"strings"
 
-	"github.com/nikkisversion/astral/collector"
-	"github.com/nikkisversion/astral/file"
-	"github.com/nikkisversion/astral/parser"
+	"github.com/nikkisversion/astral/embedder"
+	"github.com/nikkisversion/astral/reader"
 )
 
 func main() {
+
 	fmt.Println("Hello from Astral! LFG!")
 
 	filePath := "testFile.go"
 
-	fileReader, err := file.NewReadCloser(filePath)
+	newReader, err := reader.New(filePath)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
-	defer fileReader.Close()
 
-	astFile, fset, err := parser.Parse(filePath, fileReader)
+	errRead := newReader.Read()
+	if errRead != nil {
+		fmt.Println("Error reading file:", errRead)
+		return
+	}
+
+	inputs := newReader.GenerateInputForEmbedding()
+
+	newEmbedder := embedder.NewOllamaEmbedder("http://localhost:11434", "nomic-embed-text")
+	embeddings, err := newEmbedder.EmbedStrings(context.Background(), inputs)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err.Error())
+		fmt.Printf("Error embedding strings: %v\n", err)
+		return
 	}
 
-	collector := collector.New(fset, astFile, filePath)
-	ast.Walk(collector, astFile)
+	newReader.UpdateEmbedding(embeddings)
 
-	PrintChunks(collector.Chunks)
+	fmt.Printf("Collected %d chunks from %s\n", len(newReader.Collector.Chunks), filePath)
+	fmt.Printf("First chunk content preview: %v\n", newReader.Collector.Chunks[0].Embedding)
 
-}
-
-func PrintChunks(chunks []collector.Chunk) {
-	fmt.Printf("\n%-25s | %-10s | %-10s | %s\n", "NAME", "TYPE", "LINES", "CONTENT PREVIEW")
-	fmt.Println("----------------------------------------------------------------------------------------------------")
-	for _, chunk := range chunks {
-		// 1. Split content by lines to isolate and drop inline comments
-		lines := strings.Split(chunk.Content, "\n")
-		var cleanLines []string
-
-		for _, line := range lines {
-			trimmed := strings.TrimSpace(line)
-
-			// Skip entirely commented lines within the body
-			if strings.HasPrefix(trimmed, "//") {
-				continue
-			}
-
-			// If a line has code followed by an inline comment, strip the comment portion
-			if idx := strings.Index(line, "//"); idx != -1 {
-				line = line[:idx]
-			}
-
-			cleanLines = append(cleanLines, line)
-		}
-
-		// 2. Re-join and collapse all spaces/newlines into a single line preview
-		preview := strings.Join(cleanLines, " ")
-		preview = strings.Join(strings.Fields(preview), " ") // Normalizes whitespace noise
-
-		if len(preview) > 50 {
-			preview = preview[:47] + "..."
-		}
-
-		fmt.Printf("%-25s | %-10s | %d-%-6d | %s\n",
-			chunk.Name,
-			chunk.Type,
-			chunk.StartLine,
-			chunk.EndLine,
-			preview,
-		)
-	}
-	fmt.Println()
 }

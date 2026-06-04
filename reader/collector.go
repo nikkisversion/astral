@@ -1,4 +1,4 @@
-package collector
+package reader
 
 import (
 	"go/ast"
@@ -12,7 +12,7 @@ type Collector struct {
 	SourceFile string
 }
 
-func New(fset *token.FileSet, node ast.Node, sourceFile string) *Collector {
+func NewCollector(fset *token.FileSet, node ast.Node, sourceFile string) *Collector {
 	return &Collector{
 		FSet:       fset,
 		Node:       node,
