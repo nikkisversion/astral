@@ -25,17 +25,25 @@ func NewQDrantClient(ctx context.Context, collectionName string, dimension int) 
 		return nil, errors.New("Failed to create QDrant Client: " + err.Error())
 	}
 
-	// create a new collection with the specified name and dimension
-	errCl := client.CreateCollection(ctx, &qdrant.CreateCollection{
-		CollectionName: collectionName,
-		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-			Size:     uint64(dimension),
-			Distance: qdrant.Distance_Cosine,
-		}),
-	})
+	// 1. Ask Qdrant if the collection already exists
+	exists, errExist := client.CollectionExists(ctx, collectionName)
+	if errExist != nil {
+		return nil, errors.New("failed checking collection existence: " + errExist.Error())
+	}
 
-	if errCl != nil {
-		return nil, errors.New("Failed to create QDrant Collection: " + errCl.Error())
+	if !exists {
+		// create a new collection with the specified name and dimension
+		errCl := client.CreateCollection(ctx, &qdrant.CreateCollection{
+			CollectionName: collectionName,
+			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
+				Size:     uint64(dimension),
+				Distance: qdrant.Distance_Cosine,
+			}),
+		})
+
+		if errCl != nil {
+			return nil, errors.New("Failed to create QDrant Collection: " + errCl.Error())
+		}
 	}
 
 	return &QDrantStore{
