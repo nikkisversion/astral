@@ -9,6 +9,15 @@ import (
 	"github.com/nikkisversion/astral/store"
 )
 
+/* Steps:
+ 1. Run Ollama application and on terminal, pull the nomic-embed-text model using: `ollama pull nomic-embed-text`
+ 2. Run the docker command to start qdrant: docker run -p 6333:6333 -p 6334:6334 \
+    -v "$(pwd)/qdrant_storage:/qdrant/storage:z" \
+    qdrant/qdrant
+3. Run this main.go file using `go run cmd/main.go` and see the results in the terminal.
+4. Open 'http://localhost:6333/dashboard' in your browser to see the QDrant dashboard and verify that the collection and points have been created.
+*/
+
 func main() {
 
 	fmt.Println("Hello from Astral! LFG!")
@@ -39,7 +48,6 @@ func main() {
 	newReader.UpdateEmbedding(embeddings)
 
 	fmt.Printf("Collected %d chunks from %s\n", len(newReader.Collector.Chunks), filePath)
-	fmt.Printf("First chunk content preview: %v\n", newReader.Collector.Chunks[0].Embedding)
 
 	ctx := context.Background()
 	// TODO: Add logic to get dimension of current model in Ollama dynamically instead of hardcoding it
