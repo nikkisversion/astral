@@ -80,42 +80,22 @@ func (oe *OllamaEmbedder) EmbedStrings(ctx context.Context, inputs []string) ([]
 
 func (oe *OllamaEmbedder) GenerateAnswer(ctx context.Context, messages []ChatMessage) (string, error) {
 
-	// payload := map[string]any{
-	// 	"model":   oe.chatModel,
-	// 	"content": messages,
-	// 	"stream":  false,
-	// }
-
-	//fmt.Printf("Ollama Chat Payload: \n%+v\n", payload)
-
-	// buf := new(bytes.Buffer)
-
-	// if err := json.NewEncoder(buf).Encode(payload); err != nil {
-	// 	return "", errors.New("Failed to encode request body: " + err.Error())
-	// }
-
 	payload := map[string]any{
 		"model":    oe.chatModel,
 		"messages": messages,
 		"stream":   false,
 	}
 
-	body, _ := json.Marshal(payload)
+	body, errBody := json.Marshal(payload)
+	if errBody != nil {
+		return "", errors.New("Failed to encode request body: " + errBody.Error())
+	}
 
-	// ---> ADD THIS DEBUG LINE HERE <---
-	// fmt.Printf("OUTBOUND REQUEST TO OLLAMA:\n%s\n\n", string(body))
-
-	req, _ := http.NewRequestWithContext(ctx, "POST", oe.baseURL+"/api/chat", bytes.NewReader(body))
+	req, errReq := http.NewRequestWithContext(ctx, http.MethodPost, oe.baseURL+"/api/chat", bytes.NewReader(body))
+	if errReq != nil {
+		return "", errors.New("Failed to create request: " + errReq.Error())
+	}
 	req.Header.Set("Content-Type", "application/json")
-
-	// url := oe.baseURL + "/api/chat"
-
-	// req, errReq := http.NewRequestWithContext(ctx, http.MethodPost, url, buf)
-	// if errReq != nil {
-	// 	return "", errors.New("Failed to create request: " + errReq.Error())
-	// }
-
-	// req.Header.Set("Content-Type", "application/json")
 
 	resp, errResp := oe.client.Do(req)
 	if errResp != nil {
@@ -124,21 +104,13 @@ func (oe *OllamaEmbedder) GenerateAnswer(ctx context.Context, messages []ChatMes
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		// Read the error message from Ollama
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
-		return "", fmt.Errorf("ollama error (%s): %s", resp.Status, buf.String())
-		// return "", errors.New("Unexpected status code: " + resp.Status)
+		return "", errors.New("Unexpected status code: " + resp.Status)
 	}
 
-	// 1. Read the raw bytes from the response body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read body: %w", err)
+		return "", fmt.Errorf("Failed to read body: %w", err)
 	}
-
-	// 2. Dump it to the terminal so you can read the exact JSON
-	// fmt.Printf("RAW OLLAMA RESPONSE: %s\n", string(bodyBytes))
 
 	var res ChatResponse
 	if err := json.Unmarshal(bodyBytes, &res); err != nil {
