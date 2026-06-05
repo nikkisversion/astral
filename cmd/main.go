@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/nikkisversion/astral/embedder"
 	"github.com/nikkisversion/astral/reader"
@@ -38,7 +39,7 @@ func main() {
 
 	inputs := newReader.GenerateInputForEmbedding()
 
-	newEmbedder := embedder.NewOllamaEmbedder("http://localhost:11434", "nomic-embed-text")
+	newEmbedder := embedder.NewOllamaEmbedder("http://localhost:11434", "nomic-embed-text", "qwen2.5-coder:1.5b")
 	embeddings, err := newEmbedder.EmbedStrings(context.Background(), inputs)
 	if err != nil {
 		fmt.Printf("Error embedding strings: %v\n", err)
@@ -65,4 +66,44 @@ func main() {
 
 	fmt.Println("Successfully upserted chunks to vector store!")
 
+	nlQuery := "What does the NLTestFunc do?"
+	queryEmbedding, errQE := newEmbedder.EmbedStrings(ctx, []string{nlQuery})
+	if errQE != nil {
+		fmt.Printf("Error embedding NLQ: %v\n", errQE)
+		return
+	}
+
+	scoredChunks, errSS := newVS.Client.SearchSimilar(ctx, queryEmbedding[0], 3)
+	if errSS != nil {
+		fmt.Printf("Error searching similar in store: %v\n", errSS)
+		return
+	}
+
+	chatMessages := convertChunksToChatMessage(scoredChunks, nlQuery)
+
+	answer, errAns := newEmbedder.GenerateAnswer(ctx, chatMessages)
+	if errAns != nil {
+		fmt.Printf("Error generating answer: %v\n", errAns)
+		return
+	}
+
+	fmt.Printf("\nAnswer:\n%v", answer)
+
+}
+
+func convertChunksToChatMessage(chunks []store.ScoredChunk, query string) []embedder.ChatMessage {
+
+	// Combine  chunks into a single text block
+	var contextBlock strings.Builder
+	for _, chunk := range chunks {
+		contextBlock.WriteString("\n```go\n" + chunk.Content + "\n```\n")
+	}
+
+	// 2. Format the messages
+	messages := []embedder.ChatMessage{
+		{Role: "system", Content: "You are a Go code assistant. Provide a descriptive, medium-length answer based only on the code provided."},
+		{Role: "user", Content: fmt.Sprintf("Code Context:\n%s\n\nQuestion: %s", contextBlock.String(), query)},
+	}
+
+	return messages
 }

@@ -31,19 +31,24 @@ func NewQDrantClient(ctx context.Context, collectionName string, dimension int) 
 		return nil, errors.New("failed checking collection existence: " + errExist.Error())
 	}
 
-	if !exists {
-		// create a new collection with the specified name and dimension
-		errCl := client.CreateCollection(ctx, &qdrant.CreateCollection{
-			CollectionName: collectionName,
-			VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-				Size:     uint64(dimension),
-				Distance: qdrant.Distance_Cosine,
-			}),
-		})
-
-		if errCl != nil {
-			return nil, errors.New("Failed to create QDrant Collection: " + errCl.Error())
+	if exists {
+		errDel := client.DeleteCollection(ctx, collectionName)
+		if errDel != nil {
+			return nil, errors.New("Failed to delete existing QDrant Collection: " + errDel.Error())
 		}
+	}
+
+	// create a new collection with the specified name and dimension
+	errCl := client.CreateCollection(ctx, &qdrant.CreateCollection{
+		CollectionName: collectionName,
+		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
+			Size:     uint64(dimension),
+			Distance: qdrant.Distance_Cosine,
+		}),
+	})
+
+	if errCl != nil {
+		return nil, errors.New("Failed to create QDrant Collection: " + errCl.Error())
 	}
 
 	return &QDrantStore{
@@ -91,4 +96,34 @@ func (s *QDrantStore) BatchUpsert(ctx context.Context, chunks []reader.Chunk) er
 
 	return err
 
+}
+
+func (s *QDrantStore) SearchSimilar(ctx context.Context, embedding []float32, limit uint64) ([]ScoredChunk, error) {
+
+	req := &qdrant.QueryPoints{
+		CollectionName: s.collectionName,
+		Query:          qdrant.NewQuery(embedding...),
+		Limit:          &limit,
+		WithPayload:    qdrant.NewWithPayload(true),
+	}
+
+	resp, err := s.client.Query(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	scoredChunks := make([]ScoredChunk, 0, len(resp))
+	for _, point := range resp {
+
+		if content, ok := point.Payload["content"]; ok {
+			sChunk := ScoredChunk{
+				Content: content.GetStringValue(),
+				Score:   point.Score,
+			}
+			scoredChunks = append(scoredChunks, sChunk)
+		}
+
+	}
+
+	return scoredChunks, nil
 }
