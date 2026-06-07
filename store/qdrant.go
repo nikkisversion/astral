@@ -14,7 +14,7 @@ type QDrantStore struct {
 	dimension      int
 }
 
-func NewQDrantClient(ctx context.Context, collectionName string, dimension int) (*QDrantStore, error) {
+func NewQDrantStore(ctx context.Context, collectionName string, dimension int) (*QDrantStore, error) {
 
 	client, err := qdrant.NewClient(&qdrant.Config{
 		Host: "localhost",
