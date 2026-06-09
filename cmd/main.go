@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nikkisversion/astral/directoryhandler"
 	"github.com/nikkisversion/astral/embedder"
-	"github.com/nikkisversion/astral/filehandler"
 	"github.com/nikkisversion/astral/queryhandler"
 	"github.com/nikkisversion/astral/store"
 )
@@ -24,7 +24,8 @@ import (
 func main() {
 	fmt.Println("Hello from Astral! LFG!")
 
-	filePath := "/Users/nikitarai/Documents/projects/astral/reader/reader.go"
+	//filePath := "/Users/nikitarai/Documents/projects/astral/reader/reader.go"
+	path := "/Users/nikitarai/Documents/projects/astral/reader"
 	ctx := context.Background()
 
 	e := embedder.NewOllamaEmbedder("http://localhost:11434", "nomic-embed-text", "qwen2.5-coder:1.5b")
@@ -35,15 +36,29 @@ func main() {
 		return
 	}
 
-	handler, errHandler := filehandler.New(filePath, e, vs)
-	if errHandler != nil {
+	dirHandler, errDH := directoryhandler.New(path, e, vs)
+	if errDH != nil {
+		fmt.Printf("Error creating DH: %v", errDH)
 		return
 	}
 
-	errProcessFile := handler.ProcessFile(ctx)
-	if errProcessFile != nil {
+	errPD := dirHandler.ProcessDirectory(ctx)
+	if errPD != nil {
+		fmt.Printf("Error processing directory: %v", errPD)
 		return
 	}
+
+	fmt.Println("Directory processed successfully!")
+
+	// handler, errHandler := filehandler.New(filePath, e, vs)
+	// if errHandler != nil {
+	// 	return
+	// }
+
+	// errProcessFile := handler.ProcessFile(ctx)
+	// if errProcessFile != nil {
+	// 	return
+	// }
 
 	nlQuery := "What is the Read function doing? Walk me through the steps."
 	qh := queryhandler.New(e, vs)
