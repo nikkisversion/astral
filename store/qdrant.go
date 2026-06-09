@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 
 	"github.com/nikkisversion/astral/reader"
 	"github.com/qdrant/go-client/qdrant"
@@ -80,9 +83,8 @@ func (s *QDrantStore) BatchUpsert(ctx context.Context, chunks []reader.Chunk) er
 
 		// 2. Build the structural point representation
 		points[i] = &qdrant.PointStruct{
-			// Generating deterministic sequential IDs for simplicity;
-			// in production, consider using UUIDs or another robust ID generation strategy
-			Id:      qdrant.NewIDNum(uint64(i + 1)),
+			// Generate a unique ID for each chunk to avoid collision while storing in Qdrant
+			Id:      qdrant.NewIDUUID(GenerateNativeID(chunk.SourceFile, chunk.Content)),
 			Vectors: qdrant.NewVectors(chunk.Embedding...),
 			Payload: qdrant.NewValueMap(payload),
 		}
@@ -126,4 +128,23 @@ func (s *QDrantStore) SearchSimilar(ctx context.Context, embedding []float32, li
 	}
 
 	return scoredChunks, nil
+}
+
+// GenerateNativeID produces a deterministic 36-character string matching UUID format
+func GenerateNativeID(filePath string, chunkContent string) string {
+	// Combine properties to form an absolute unique identifier
+	uniqueSalt := filePath + "::" + chunkContent
+
+	// Create a SHA-256 hash
+	hash := sha256.Sum256([]byte(uniqueSalt))
+	encoded := hex.EncodeToString(hash[:])
+
+	// Format the raw hex into a valid UUID pattern: 8-4-4-4-12 characters
+	return fmt.Sprintf("%s-%s-%s-%s-%s",
+		encoded[0:8],
+		encoded[8:12],
+		encoded[12:16],
+		encoded[16:20],
+		encoded[20:32],
+	)
 }

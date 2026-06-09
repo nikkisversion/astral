@@ -50,17 +50,7 @@ func main() {
 
 	fmt.Println("Directory processed successfully!")
 
-	// handler, errHandler := filehandler.New(filePath, e, vs)
-	// if errHandler != nil {
-	// 	return
-	// }
-
-	// errProcessFile := handler.ProcessFile(ctx)
-	// if errProcessFile != nil {
-	// 	return
-	// }
-
-	nlQuery := "What is the Read function doing? Walk me through the steps."
+	nlQuery := "What is the Visit function doing? Walk me through the steps."
 	qh := queryhandler.New(e, vs)
 	answer, errAns := qh.Handle(ctx, nlQuery)
 	if errAns != nil {
